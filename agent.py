@@ -14,18 +14,6 @@ class LearningAgent(Agent):
         self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
         # TODO: Initialize any additional variables here
 
-       # Define a set of nine possible states for the smartcab
-
-        self.state1 = 'Red Light - Next waypoint NOT right'
-        self.state2 = 'Red Light - Next waypoint right - Clear on the left'
-        self.state3 = 'Red Light - Next waypoint right - NOT clear on the left - left car NOT going forward'
-        self.state4 = 'Red Light - Next waypoint right - NOT clear on the left - left car is going forward'
-        self.state5 = 'Green Light - Next waypoint right'
-        self.state6 = 'Green Light - Next waypoint forward'
-        self.state7 = 'Green Light - Next waypoint left - Clear oncoming'
-        self.state8 = 'Green Light - Next waypoint left - NOT clear oncoming - oncoming car turning left'
-        self.state9 = 'Green Light - Next waypoint left - NOT clear oncoming - oncoming car NOT turning left'
-
         # Define the four possible actions for the smartcab
 
         self.action1 = None
@@ -35,17 +23,7 @@ class LearningAgent(Agent):
 
         # Initialize the Q-Table with zeroes:
 
-        self.q_table = {
-                self.state1:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state2:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state3:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state4:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state5:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state6:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state7:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state8:{self.action1:0,self.action2:0,self.action3:0,self.action4:0},
-                self.state9:{self.action1:0,self.action2:0,self.action3:0,self.action4:0}
-                }
+        self.q_table = {}
 
         # Initialize other variables that are used for generating performance metrics
 
@@ -57,8 +35,6 @@ class LearningAgent(Agent):
 
         self.wrong_moves = 0
 
-        self.deadline_start = 0
-
         self.trip_counter = 1
 
         self.deadline_data =[]
@@ -68,11 +44,15 @@ class LearningAgent(Agent):
         # TODO: Prepare for a new trip; reset any variables here, if required
 
         # Reset the 'old' state, action and reward values.
-        # The 'old' state and current state are both used for updating the q-table
+        # The 'old' state and current state are both used for updating the q-table.
 
-        self.state_old = self.state1
-        self.action_old = None
+        self.state_old = 'NA'
+
+        self.action_old = 'NA'
+
         self.reward_old = 0
+
+        #deadline_start is used as part of the performance metrics I've developed for grading a learner
 
         self.deadline_start = 0
 
@@ -87,51 +67,32 @@ class LearningAgent(Agent):
 
         # TODO: Update state
 
-        # The smartcab is in 1 of the 9 states, depending on the inputs
+        self.state =(('light',inputs['light']),('left',inputs['left']),('right',inputs['right']),('oncoming',inputs['oncoming']),('next',self.next_waypoint))
 
-        if inputs['light'] == 'red':
-            if self.next_waypoint != 'right':
-                self.state = self.state1
-            else:
-                if inputs['left'] == None:
-                    self.state = self.state2
-                else:
-                    if inputs['left'] != 'forward':
-                        self.state = self.state3
-                    else:
-                        self.state = self.state4
-        else:
-            if self.next_waypoint == 'right':
-                self.state = self.state5
-            elif self.next_waypoint == 'forward':
-                self.state = self.state6
-            else:
-                if inputs['oncoming'] == None:
-                    self.state = self.state7
-                else:
-                    if inputs['oncoming'] == 'left':
-                        self.state = self.state8
-                    else:
-                        self.state = self.state9
 
         # TODO: Select action according to your policy
 
+        if self.state not in self.q_table.keys():
+            self.q_table[self.state] = {self.action1:0,self.action2:0,self.action3:0,self.action4:0}
+
         # Print out current state and old action, for visualization and troubleshooting
 
-        print "current state:", self.state
+        print "Simulated steps:", self.sim_time
 
-        print "old action:", self.action_old
+        print "Current state:", self.state
+
+        print "Old action:", self.action_old
 
         # Implement Epsilon greedy learning
 
         # Both constant and time decayed versions of epsilon were tested; only the final version is not commented out
 
-        if self.sim_time < 1500:
-            epsilon = 0.02
+        if self.sim_time < 500:
+            epsilon = 0.2
         else:
             epsilon = 0.0
 
-#        epsilon = 0.02 / log(self.sim_time + 2)
+#        epsilon = 0.05 / log(self.sim_time + 2)
 
 #        epsilon = 0.9 / (1 + self.sim_time / 10)
 
@@ -144,24 +105,21 @@ class LearningAgent(Agent):
         if random_move == 1:
 
             print "random move!"
-            action_choose = random.choice(self.q_table[self.state].keys())
-            action = action_choose
+            action = random.choice([self.action1,self.action2,self.action3,self.action4])
 
-        # If an epsilon random move is not chosen, a random move is possible if all Q values are identical for each action
+        # If an epsilon random move is not chosen, a random move is possible if all Q values are identical for each action in a given state
 
         else:
             if self.q_table[self.state][self.action1] == self.q_table[self.state][self.action2] == self.q_table[self.state][self.action3] == self.q_table[self.state][self.action4]:
-                action_choose = random.choice(self.q_table[self.state].keys())
-                action = action_choose
+                action = random.choice(self.q_table[self.state].keys())
 
         # If the q values for each action are not identical, then choose the action that maps to the highest Q value
 
             else:
 
-                action_choose =  max(self.q_table[self.state].iterkeys(), key=(lambda key: self.q_table[self.state][key]))
-                action = action_choose
+                action =  max(self.q_table[self.state].iterkeys(), key=(lambda key: self.q_table[self.state][key]))
 
-        print "new action:", action_choose
+        print "New action:", action
 
         # Execute action and get reward
         reward = self.env.act(self, action)
@@ -228,8 +186,8 @@ class LearningAgent(Agent):
 
 #        alpha = 0.5 / log(self.sim_time + 2)
 
-        alpha = 0.1
-        gamma = 0.1
+        alpha = 0.5
+        gamma = 0.05
 
         # print learning parameters, for visualization and troubleshooting purposes
 
@@ -239,13 +197,16 @@ class LearningAgent(Agent):
 
         # Update the Q-table values, using the formula provided in the Reinforcement Learning lecture series
 
-        self.q_table[self.state_old][self.action_old] = (1-alpha) * self.q_table[self.state_old][self.action_old] + alpha * (self.reward_old + gamma * self.q_table[self.state][action_choose])
+        if self.state_old == 'NA':
+            self.q_table[self.state][action] = alpha * reward
+        else:
+            self.q_table[self.state_old][self.action_old] = (1-alpha) * self.q_table[self.state_old][self.action_old] + alpha * (self.reward_old + gamma * self.q_table[self.state][action])
 
         # Update the 'old' state, action and reward before looping back to the next move
 
         self.state_old = self.state
 
-        self.action_old = action_choose
+        self.action_old = action
 
         self.reward_old = reward
 
@@ -268,7 +229,7 @@ def run():
     # NOTE: You can set enforce_deadline=False while debugging to allow longer trials
 
     # Now simulate it
-    sim = Simulator(e, update_delay=0.0001, display=False)  # create simulator (uses pygame when display=True, if available)
+    sim = Simulator(e, update_delay=0.0000001, display=False)  # create simulator (uses pygame when display=True, if available)
     # NOTE: To speed up simulation, reduce update_delay and/or set display=False
 
     sim.run(n_trials=100)  # run for a specified number of trials
